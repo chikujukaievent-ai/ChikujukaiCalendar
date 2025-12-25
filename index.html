@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 5px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; } /* 少しだけ文字を小さく */
+    th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; vertical-align: top; }
+    th { background: #f4f4f4; position: sticky; top: 0; }
+    .has-event { background-color: #ffebee; }
+    .date-column { width: 18%; white-space: nowrap; }
+    .time-label { font-size: 0.85em; color: #d32f2f; font-weight: bold; display: block; }
+    .location-label { font-size: 0.8em; color: #1976d2; display: inline-block; margin-top: 2px; }
+    .location-label:hover { color: #0d47a1; }
+    .event-item { margin-bottom: 4px; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
+    .event-item:last-child { border-bottom: none; }
+    .sun { color: red; }
+    .sat { color: blue; }
+    .date-link { color: inherit; text-decoration: none; display: inline-block; width: 100%; }
+    .date-link:hover { text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div id="content">読み込み中...</div>
+
+  <script>
+    const GCAL_BASE = "https://calendar.google.com/calendar/u/0"; // u/0 で現在のアカウントを優先
+
+    function buildGCalLinks(dateObj, config) {
+      const y = dateObj.getFullYear();
+      const m = ("0" + (dateObj.getMonth() + 1)).slice(-2);
+      const d = ("0" + dateObj.getDate()).slice(-2);
+
+      // デフォルト時間（秒を含めた形式、JST想定）
+      const startTime = config?.defaultStartTime || "09:30";
+      const endTime = config?.defaultEndTime || "11:30";
+      const [startH, startMin] = startTime.split(":");
+      const [endH, endMin] = endTime.split(":");
+      const start = `${startH}${startMin}00`;
+      const end = `${endH}${endMin}00`;
+      
+      const ctz = encodeURIComponent(config?.timezone || "Asia/Tokyo");
+      const calendarId = config?.calendarId ? encodeURIComponent(config.calendarId) : "";
+      const title = encodeURIComponent(config?.defaultEventTitle || "稽古日");
+      const location = encodeURIComponent(config?.defaultLocation || "川東コミュニティセンター");
+
+      // Google Calendar テンプレートURL
+      const createUrl = `${GCAL_BASE}/r/eventedit?dates=${y}${m}${d}T${start}/${y}${m}${d}T${end}&ctz=${ctz}&text=${title}${calendarId ? `&src=${calendarId}` : ''}&location=${location}`;
+
+      return {
+        createUrl
+      };
+    }
+
+    google.script.run.withSuccessHandler(function(data) {
+      let html = '<table><tr><th class="date-column">日付</th><th>時間・予定・場所</th></tr>';
+      let curr = new Date();
+      
+      for (let i = 0; i < 60; i++) {
+        let dateStr = curr.getFullYear() + '-' + 
+                      ('0' + (curr.getMonth()+1)).slice(-2) + '-' + 
+                      ('0' + curr.getDate()).slice(-2);
+        
+        let displayDate = (curr.getMonth() + 1) + '/' + curr.getDate();
+        let dayIdx = curr.getDay();
+        let dayOfWeek = ['日','月','火','水','木','金','土'][dayIdx];
+        let dayClass = dayIdx === 0 ? 'sun' : (dayIdx === 6 ? 'sat' : '');
+        
+        let events = data.schedule[dateStr] || [];
+        let rowClass = events.length > 0 ? 'has-event' : '';
+
+        const gcal = buildGCalLinks(curr, data.config);
+        
+        let eventHtml = events.map(ev => {
+          let locationHtml = '';
+          if (ev.location) {
+            // 📍マークを除去して場所名だけを取得
+            let locationName = ev.location.replace('📍', '');
+            let mapsUrl = "https://maps.google.com/?q=" + encodeURIComponent(locationName);
+            locationHtml = '<a href="' + mapsUrl + '" target="_blank" class="location-label" style="text-decoration: underline;">' + ev.location + '</a>';
+          }
+          return `
+          <div class="event-item">
+            <span class="time-label">${ev.time}</span>
+            <strong>${ev.title}</strong>
+            ${locationHtml}
+          </div>
+        `;
+        }).join('');
+        
+        html += `<tr class="${rowClass}">
+          <td class="date-column ${dayClass}"><a class="date-link" href="${gcal.createUrl}" target="_blank" rel="noopener">${displayDate}(${dayOfWeek})</a></td>
+          <td>${eventHtml}</td>
+        </tr>`;
+        curr.setDate(curr.getDate() + 1);
+      }
+      html += '</table>';
+      document.getElementById('content').innerHTML = html;
+    }).withFailureHandler(function(error) {
+      document.getElementById('content').innerHTML = '<div style="color:red;padding:20px;">エラー: ' + error.message + '</div>';
+    }).getCalendarData();
+  </script>
+</body>
+</html>
