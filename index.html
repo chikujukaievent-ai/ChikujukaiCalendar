@@ -1,79 +1,282 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 5px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; } /* 少しだけ文字を小さく */
-    th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; vertical-align: top; }
-    th { background: #f4f4f4; position: sticky; top: 0; }
-    .has-event { background-color: #ffebee; }
-    .date-column { width: 18%; white-space: nowrap; }
-    .time-label { font-size: 0.85em; color: #d32f2f; font-weight: bold; display: block; }
-    .location-label { font-size: 0.8em; color: #1976d2; display: inline-block; margin-top: 2px; }
-    .location-label:hover { color: #0d47a1; }
-    .event-item { margin-bottom: 4px; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
-    .event-item:last-child { border-bottom: none; }
-    .sun { color: red; }
-    .sat { color: blue; }
-    .date-link { color: inherit; text-decoration: none; display: inline-block; width: 100%; }
-    .date-link:hover { text-decoration: none; }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 5px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f4f4f4;
+      position: sticky;
+      top: 0;
+    }
+
+    .has-event {
+      background-color: #ffebee;
+    }
+
+    .date-column {
+      width: 18%;
+      white-space: nowrap;
+    }
+
+    .time-label {
+      font-size: 0.85em;
+      color: #d32f2f;
+      font-weight: bold;
+      display: block;
+    }
+
+    .location-label {
+      font-size: 0.8em;
+      color: #1976d2;
+      display: inline-block;
+      margin-top: 2px;
+    }
+
+    .location-label:hover {
+      color: #0d47a1;
+    }
+
+    .event-item {
+      margin-bottom: 4px;
+      border-bottom: 1px dashed #eee;
+      padding-bottom: 2px;
+    }
+
+    .event-item:last-child {
+      border-bottom: none;
+    }
+
+    .sun {
+      color: red;
+    }
+
+    .sat {
+      color: blue;
+    }
+
+    .date-cell {
+      cursor: pointer;
+    }
+
+    .date-cell:hover {
+      background-color: #e3f2fd;
+    }
+
+    /* モーダルメニュー */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-menu {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      min-width: 280px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 12px;
+      text-align: center;
+      color: #333;
+    }
+
+    .menu-btn {
+      display: block;
+      width: 100%;
+      padding: 12px 16px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      text-align: left;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    .menu-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .menu-btn.both {
+      background: linear-gradient(135deg, #4CAF50, #2E7D32);
+      color: white;
+    }
+
+    .menu-btn.kawahigashi {
+      background: linear-gradient(135deg, #FF9800, #F57C00);
+      color: white;
+    }
+
+    .menu-btn.nagazumi {
+      background: linear-gradient(135deg, #2196F3, #1565C0);
+      color: white;
+    }
+
+    .menu-btn.cancel {
+      background: #f5f5f5;
+      color: #666;
+      text-align: center;
+    }
+
+    .menu-btn .time-info {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-top: 2px;
+    }
   </style>
 </head>
+
 <body>
   <div id="content">読み込み中...</div>
 
-  <script>
-    const GCAL_BASE = "https://calendar.google.com/calendar/u/0"; // u/0 で現在のアカウントを優先
+  <!-- 選択メニューモーダル -->
+  <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-menu" onclick="event.stopPropagation()">
+      <div class="modal-title" id="modal-date-title">予定を追加</div>
+      <button class="menu-btn both" id="btn-both">
+        📅 同日（川東 + 長炭）
+        <div class="time-info">午前 9:30〜 ＆ 午後 13:30〜</div>
+      </button>
+      <button class="menu-btn kawahigashi" id="btn-kawahigashi">
+        🏠 川東のみ
+        <div class="time-info">9:30〜11:30 川東コミュニティセンター</div>
+      </button>
+      <button class="menu-btn nagazumi" id="btn-nagazumi">
+        🏛️ 長炭のみ
+        <div class="time-info">13:30〜15:30 長炭公民館</div>
+      </button>
+      <button class="menu-btn cancel" onclick="closeModal()">キャンセル</button>
+    </div>
+  </div>
 
-    function buildGCalLinks(dateObj, config) {
+  <script>
+    const GCAL_BASE = "https://calendar.google.com/calendar/u/0";
+    let currentConfig = null;
+    let selectedDate = null;
+
+    function buildGCalUrl(dateObj, eventType, config) {
       const y = dateObj.getFullYear();
       const m = ("0" + (dateObj.getMonth() + 1)).slice(-2);
       const d = ("0" + dateObj.getDate()).slice(-2);
 
-      // デフォルト時間（秒を含めた形式、JST想定）
-      const startTime = config?.defaultStartTime || "09:30";
-      const endTime = config?.defaultEndTime || "11:30";
-      const [startH, startMin] = startTime.split(":");
-      const [endH, endMin] = endTime.split(":");
+      const [startH, startMin] = eventType.startTime.split(":");
+      const [endH, endMin] = eventType.endTime.split(":");
       const start = `${startH}${startMin}00`;
       const end = `${endH}${endMin}00`;
-      
+
       const ctz = encodeURIComponent(config?.timezone || "Asia/Tokyo");
       const calendarId = config?.calendarId ? encodeURIComponent(config.calendarId) : "";
-      const title = encodeURIComponent(config?.defaultEventTitle || "稽古日");
-      const location = encodeURIComponent(config?.defaultLocation || "川東コミュニティセンター");
+      const title = encodeURIComponent(eventType.title);
 
-      // Google Calendar テンプレートURL
-      const createUrl = `${GCAL_BASE}/r/eventedit?dates=${y}${m}${d}T${start}/${y}${m}${d}T${end}&ctz=${ctz}&text=${title}${calendarId ? `&src=${calendarId}` : ''}&location=${location}`;
+      // 場所にGoogle Mapsリンクを含める
+      const locationWithMap = eventType.location;
+      const location = encodeURIComponent(locationWithMap);
 
-      return {
-        createUrl
-      };
+      return `${GCAL_BASE}/r/eventedit?dates=${y}${m}${d}T${start}/${y}${m}${d}T${end}&ctz=${ctz}&text=${title}${calendarId ? `&src=${calendarId}` : ''}&location=${location}`;
     }
 
-    google.script.run.withSuccessHandler(function(data) {
+    function showModal(dateObj, config) {
+      selectedDate = dateObj;
+      currentConfig = config;
+
+      const displayDate = (dateObj.getMonth() + 1) + '/' + dateObj.getDate();
+      const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][dateObj.getDay()];
+      document.getElementById('modal-date-title').textContent = `${displayDate}(${dayOfWeek}) に予定を追加`;
+
+      document.getElementById('modal-overlay').classList.add('show');
+    }
+
+    function closeModal(event) {
+      if (!event || event.target === document.getElementById('modal-overlay')) {
+        document.getElementById('modal-overlay').classList.remove('show');
+      }
+    }
+
+    function handleEventChoice(choice) {
+      if (!selectedDate || !currentConfig) return;
+
+      const events = currentConfig.events;
+
+      if (choice === 'both') {
+        // 両方を新しいタブで開く
+        window.open(buildGCalUrl(selectedDate, events.KAWAHIGASHI, currentConfig), '_blank');
+        setTimeout(() => {
+          window.open(buildGCalUrl(selectedDate, events.NAGAZUMI, currentConfig), '_blank');
+        }, 300);
+      } else if (choice === 'kawahigashi') {
+        window.open(buildGCalUrl(selectedDate, events.KAWAHIGASHI, currentConfig), '_blank');
+      } else if (choice === 'nagazumi') {
+        window.open(buildGCalUrl(selectedDate, events.NAGAZUMI, currentConfig), '_blank');
+      }
+
+      closeModal();
+    }
+
+    // ボタンイベント設定
+    document.getElementById('btn-both').onclick = () => handleEventChoice('both');
+    document.getElementById('btn-kawahigashi').onclick = () => handleEventChoice('kawahigashi');
+    document.getElementById('btn-nagazumi').onclick = () => handleEventChoice('nagazumi');
+
+    google.script.run.withSuccessHandler(function (data) {
       let html = '<table><tr><th class="date-column">日付</th><th>時間・予定・場所</th></tr>';
       let curr = new Date();
-      
-      for (let i = 0; i < 60; i++) {
-        let dateStr = curr.getFullYear() + '-' + 
-                      ('0' + (curr.getMonth()+1)).slice(-2) + '-' + 
-                      ('0' + curr.getDate()).slice(-2);
-        
+
+      for (let i = 0; i < 120; i++) {
+        let dateStr = curr.getFullYear() + '-' +
+          ('0' + (curr.getMonth() + 1)).slice(-2) + '-' +
+          ('0' + curr.getDate()).slice(-2);
+
         let displayDate = (curr.getMonth() + 1) + '/' + curr.getDate();
         let dayIdx = curr.getDay();
-        let dayOfWeek = ['日','月','火','水','木','金','土'][dayIdx];
+        let dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][dayIdx];
         let dayClass = dayIdx === 0 ? 'sun' : (dayIdx === 6 ? 'sat' : '');
-        
+
         let events = data.schedule[dateStr] || [];
         let rowClass = events.length > 0 ? 'has-event' : '';
 
-        const gcal = buildGCalLinks(curr, data.config);
-        
+        // 日付用のデータ属性を追加
+        const dateData = curr.toISOString();
+
         let eventHtml = events.map(ev => {
           let locationHtml = '';
           if (ev.location) {
-            // 📍マークを除去して場所名だけを取得
             let locationName = ev.location.replace('📍', '');
             let mapsUrl = "https://maps.google.com/?q=" + encodeURIComponent(locationName);
             locationHtml = '<a href="' + mapsUrl + '" target="_blank" class="location-label" style="text-decoration: underline;">' + ev.location + '</a>';
@@ -86,18 +289,28 @@
           </div>
         `;
         }).join('');
-        
+
         html += `<tr class="${rowClass}">
-          <td class="date-column ${dayClass}"><a class="date-link" href="${gcal.createUrl}" target="_blank" rel="noopener">${displayDate}(${dayOfWeek})</a></td>
+          <td class="date-column date-cell ${dayClass}" data-date="${dateData}">${displayDate}(${dayOfWeek})</td>
           <td>${eventHtml}</td>
         </tr>`;
         curr.setDate(curr.getDate() + 1);
       }
       html += '</table>';
       document.getElementById('content').innerHTML = html;
-    }).withFailureHandler(function(error) {
+
+      // 日付セルにクリックイベントを追加
+      document.querySelectorAll('.date-cell').forEach(cell => {
+        cell.addEventListener('click', function () {
+          const dateStr = this.getAttribute('data-date');
+          const dateObj = new Date(dateStr);
+          showModal(dateObj, data.config);
+        });
+      });
+    }).withFailureHandler(function (error) {
       document.getElementById('content').innerHTML = '<div style="color:red;padding:20px;">エラー: ' + error.message + '</div>';
     }).getCalendarData();
   </script>
 </body>
+
 </html>
